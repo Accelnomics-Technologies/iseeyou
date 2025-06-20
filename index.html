@@ -226,7 +226,7 @@
             console.log(">>", imageBase64URL);
 
             const response = await fetch(
-                "http://localhost:8000/chat-completion",
+                "http://iseeyou-backend.dev.svc.cluster.local:80/chat-completion",
                 {
                     method: "POST",
                     headers: {
@@ -252,7 +252,7 @@
 
        async function sendSMS(phoneValue, comment) {
     try {
-        const response = await fetch("http://localhost:8000/send-sms", {
+        const response = await fetch("http://iseeyou-backend.dev.svc.cluster.local:80/send-sms", {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
