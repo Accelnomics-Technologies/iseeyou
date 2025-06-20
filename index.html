@@ -2,8 +2,8 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Camera Interaction App</title>
     <style>
         body {
@@ -85,23 +85,25 @@
 </head>
 
 <body>
-
-    <div><img src="ethan-logo.svg" alt="Ethan" style="max-width: 200px; height: 50px;" /></div>
+    <div>
+        <img src="ethan-logo.svg" alt="Ethan" style="max-width: 200px; height: 50px" />
+    </div>
 
     <video id="videoFeed" autoplay playsinline></video>
-    <canvas id="canvas" class="hidden"></canvas> <!-- For capturing frames -->
+    <canvas id="canvas" class="hidden"></canvas>
+    <!-- For capturing frames -->
 
     <div class="io-areas">
         <div>
-            <label for="baseURL">Base API:</label><br>
-            <input id="baseURL" name="Instruction" value="http://localhost:8080"></textarea>
+            <label for="phone">Notification Mobile Number:</label><br>
+            <input id="phone" name="phone" value=""></textarea>
         </div>
         <div>
-            <label for="instructionText">Instruction:</label><br>
-            <textarea id="instructionText" style="height: 2em; width: 40em" name="Instruction"></textarea>
+            <label for="detect">Detect:</label><br />
+            <textarea id="detect" style="height: 2em; width: 40em" name="Detect"></textarea>
         </div>
         <div>
-            <label for="responseText">Response:</label><br>
+            <label for="responseText">Response:</label><br />
             <textarea id="responseText" style="height: 2em; width: 40em" name="Response" readonly
                 placeholder="Server response will appear here..."></textarea>
         </div>
@@ -110,71 +112,150 @@
     <div class="controls">
         <label for="intervalSelect">Interval between 2 requests:</label>
         <select id="intervalSelect" name="Interval between 2 requests">
-            <option value="100">100ms</option>
-            <option value="250">250ms</option>
-            <option value="500" selected>500ms</option>
-            <option value="1000">1s</option>
-            <option value="2000">2s</option>
+            <!-- <option value="100">100ms</option>
+            <option value="250">250ms</option> -->
+            <option value="500">500ms</option>
+            <option value="1000">1 sec</option>
+            <option value="2000" selected>2 sec</option>
+            <option value="4000">4 sec</option>
+            <option value="6000">6 sec</option>
+            <option value="8000">8 sec</option>
+            <option value="10000">10 sec</option>
         </select>
         <button id="startButton" class="start">Start</button>
     </div>
 
     <script>
-        const video = document.getElementById('videoFeed');
-        const canvas = document.getElementById('canvas');
-        const baseURL = document.getElementById('baseURL');
-        const instructionText = document.getElementById('instructionText');
-        const responseText = document.getElementById('responseText');
-        const intervalSelect = document.getElementById('intervalSelect');
-        const startButton = document.getElementById('startButton');
+        const video = document.getElementById("videoFeed");
+        const canvas = document.getElementById("canvas");
+        const phone = document.getElementById("phone");
+        //   const instructionText = document.getElementById("instructionText");
+        const responseText = document.getElementById("responseText");
+        const detect = document.getElementById("detect");
+        const intervalSelect = document.getElementById("intervalSelect");
+        const startButton = document.getElementById("startButton");
 
-        instructionText.value = "What do you see?"; // default instruction
+        //   instructionText.value = "What do you see?"; // default instruction
+        console.log(">>", phone);
 
         let stream;
         let intervalId;
         let isProcessing = false;
 
-        // Returns response text (string)
-        async function sendChatCompletionRequest(instruction, imageBase64URL) {
-            const response = await fetch(`${baseURL.value}/v1/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    max_tokens: 100,
-                    messages: [
-                        {
-                            role: 'user', content: [
-                                { type: 'text', text: instruction },
-                                {
-                                    type: 'image_url', image_url: {
-                                        url: imageBase64URL,
-                                    }
-                                }
-                            ]
-                        },
-                    ]
-                })
+        function llmReadJson(text) {
+            // Fetch from markdown ```json if present
+            text = text.trim().split("```json").pop().split("```")[0];
+
+            // Split anything before the first {
+            text = "{" + text.split("{", 2).pop();
+
+            // Split anything after the last }
+            const lastClosingBrace = text.lastIndexOf("}");
+            text = text.substring(0, lastClosingBrace + 1);
+
+            // Escape new lines within strings
+            const pattern = /"(?:[^"\\]|\\.)*"/g;
+            text = text.replace(pattern, (match) => {
+                return match.replace(/\n/g, "\\n");
             });
-            if (!response.ok) {
-                const errorData = await response.text();
-                return `Server error: ${response.status} - ${errorData}`;
-            }
-            const data = await response.json();
-            return data.choices[0].message.content;
+
+            return JSON.parse(text);
         }
+
+        async function sendChatCompletionRequest(instruction, imageBase64URL) {
+            const response = await fetch(
+                "https://api.openai.com/v1/chat/completions",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization:
+                            "Bearer "
+                    },
+                    body: JSON.stringify({
+                        model: "o4-mini",
+                        messages: [
+                            {
+                                role: "user",
+                                content: [
+                                    { type: "text", text: instruction },
+                                    { type: "image_url", image_url: { url: imageBase64URL } },
+                                ],
+                            },
+                        ],
+                        max_completion_tokens: 3000,
+                    }),
+                }
+            );
+
+            const data = await response.json();
+            console.log(data.choices[0].message.content);
+            output = data.choices[0].message.content;
+            trimmedOutput = llmReadJson(output);
+            console.log("Trimmed Output:", trimmedOutput);
+
+
+
+            return trimmedOutput;
+        }
+
+        const TWILIO_ACCOUNT_SID = "";
+        const TWILIO_AUTH_TOKEN = "";
+        const FROM_NUMBER = ''; // Replace with your Twilio number
+
+        async function sendSMS(phoneValue, comment) {
+            const messageData = `Body=${encodeURIComponent(comment)}&From=${encodeURIComponent(FROM_NUMBER)}&To=${encodeURIComponent(phoneValue)}`;
+
+            try {
+                const response = await fetch(
+                    `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Basic ' + btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`),
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: messageData,
+                    }
+                );
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Failed to send message:', errorData);
+                    throw new Error('Failed to send message');
+                }
+
+                const data = await response.json();
+                console.log('Message sent successfully:', data);
+                return data;
+            } catch (error) {
+                console.error('Error:', error.message);
+                throw error;
+            }
+        }
+
+
+
+
+
+
+
 
         // 1. Ask for camera permission on load
         async function initCamera() {
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: false,
+                });
                 video.srcObject = stream;
                 responseText.value = "Camera access granted. Ready to start.";
             } catch (err) {
                 console.error("Error accessing camera:", err);
                 responseText.value = `Error accessing camera: ${err.name} - ${err.message}. Please ensure permissions are granted and you are on HTTPS or localhost.`;
-                alert(`Error accessing camera: ${err.name}. Make sure you've granted permission and are on HTTPS or localhost.`);
+                alert(
+                    `Error accessing camera: ${err.name}. Make sure you've granted permission and are on HTTPS or localhost.`
+                );
             }
         }
 
@@ -185,34 +266,66 @@
             }
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            const context = canvas.getContext('2d');
+            const context = canvas.getContext("2d");
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            return canvas.toDataURL('image/jpeg', 0.8); // Use JPEG for smaller size, 0.8 quality
+            return canvas.toDataURL("image/jpeg", 0.8); // Use JPEG for smaller size, 0.8 quality
         }
 
         async function sendData() {
             if (!isProcessing) return; // Ensure we don't have overlapping requests if processing takes longer than interval
 
-            const instruction = instructionText.value;
+            // const instruction = instructionText.value;
             const imageBase64URL = captureImage();
 
             if (!imageBase64URL) {
-                responseText.value = "Failed to capture image. Stream might not be active.";
+                responseText.value =
+                    "Failed to capture image. Stream might not be active.";
                 // Optionally stop processing if image capture fails consistently
                 // handleStop();
                 return;
             }
 
+            const instruction_1 = `You are given an image. Analyze it to determine whether it contains any form of visual evidence suggestive of child abuse, including but not limited to physical harm, inappropriate exposure, neglect, or exploitation. Use discretion, prioritize the safety and privacy of individuals, and follow strict ethical and legal guidelines.
+      **STRICT VALIDATION RULES**:
+
+      Only respond if the content is clearly suggestive of child abuse, otherwise return false.
+      Be cautious not to mislabel images of regular family or child activities.
+      If unsure, default to false (conservative judgment).
+      Use professional, non-explicit language in the comment.
+
+      **RESPONSE FORMAT**
+      Return **only** this JSON (no extra text):
+
+      \`\`\`json
+      {
+        "Detected": "<true|false>",
+        "comment": "<A factual, responsible summary of the findings in no more than 100 words.>"
+      }
+      \`\`\``;
             const payload = {
-                instruction: instruction,
-                imageBase64URL: imageBase64URL
+                instruction: instruction_1,
+                imageBase64URL: imageBase64URL,
             };
 
             try {
-                const response = await sendChatCompletionRequest(payload.instruction, payload.imageBase64URL);
-                responseText.value = response;
+                const response = await sendChatCompletionRequest(
+                    instruction_1,
+                    payload.imageBase64URL
+                );
+                console.log("Response from server:", response);
+                console.log("Comment from server:", response.comment);
+                detect.value = response.Detected;
+                responseText.value = response.comment;
+                if (response.Detected === "false" && phone.value && response.comment) {
+                    // Send SMS if abuse is detected
+
+
+                    await sendSMS(phone.value, response.comment);
+                    console.log("SMS sent successfully.");
+
+                }
             } catch (error) {
-                console.error('Error sending data:', error);
+                console.error("Error sending data:", error);
                 responseText.value = `Error: ${error.message}`;
             }
         }
@@ -223,12 +336,16 @@
                 alert("Camera not available. Please grant permission first.");
                 return;
             }
+            if (!phone.value) {
+                alert("Please enter a valid phone number to start processing.");
+                return;
+            }
             isProcessing = true;
             startButton.textContent = "Stop";
-            startButton.classList.remove('start');
-            startButton.classList.add('stop');
+            startButton.classList.remove("start");
+            startButton.classList.add("stop");
 
-            instructionText.disabled = true;
+            // instructionText.disabled = true;
             intervalSelect.disabled = true;
 
             responseText.value = "Processing started...";
@@ -249,17 +366,17 @@
                 intervalId = null;
             }
             startButton.textContent = "Start";
-            startButton.classList.remove('stop');
-            startButton.classList.add('start');
+            startButton.classList.remove("stop");
+            startButton.classList.add("start");
 
-            instructionText.disabled = false;
+            // instructionText.disabled = false;
             intervalSelect.disabled = false;
             if (responseText.value.startsWith("Processing started...")) {
                 responseText.value = "Processing stopped.";
             }
         }
 
-        startButton.addEventListener('click', () => {
+        startButton.addEventListener("click", () => {
             if (isProcessing) {
                 handleStop();
             } else {
@@ -268,18 +385,17 @@
         });
 
         // Initialize camera when the page loads
-        window.addEventListener('DOMContentLoaded', initCamera);
+        window.addEventListener("DOMContentLoaded", initCamera);
 
         // Optional: Stop stream when page is closed/navigated away to release camera
-        window.addEventListener('beforeunload', () => {
+        window.addEventListener("beforeunload", () => {
             if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+                stream.getTracks().forEach((track) => track.stop());
             }
             if (intervalId) {
                 clearInterval(intervalId);
             }
         });
-
     </script>
 </body>
 
