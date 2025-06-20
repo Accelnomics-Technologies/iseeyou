@@ -31,7 +31,7 @@ jobs:
         tags: ghcr.io/accelnomics-technologies/iseeyou:${{ github.sha }}
 
   update-manifests:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: build-and-push
 
     steps:
